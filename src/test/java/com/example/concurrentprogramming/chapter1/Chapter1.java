@@ -29,7 +29,6 @@ public class Chapter1 {
     }
 
     public static class CallerTask implements Callable<String> {
-
         @Override
         public String call() throws Exception {
             System.out.println("I am a child thread.(implements Callable<String>)");
@@ -51,12 +50,11 @@ public class Chapter1 {
         new Thread(task).start();
         new Thread(task).start();
 
-        //③使用 FutureTask 的方式
-        //创建一个 FutureTask 对象（CallerTask的实例），然后使用创建的 futureTask对象作为任务创建了一个线程并且启动它
-        // 最后通过 futureTask.get() 等待任务执行完毕并返回结果
+        //③使用 FutureTask 方式(有返回值)
+        //使用CallerTask的实例创建一个FutureTask对象，然后使用该futureTask对象作为任务创建一个线程并启动
         FutureTask<String> futureTask = new FutureTask<>(new CallerTask());
         new Thread(futureTask).start();
-
+        //最后通过 futureTask.get() 等待任务执行完毕并返回结果
         try {
             //等待线程执行完毕，并返回结果
             String returnValue = futureTask.get();
@@ -258,12 +256,12 @@ public class Chapter1 {
 
         //启动线程1
         threadOne.start();
-        //延迟1s启动线程2
+        //启动线程2并且线程2先休眠1s
         threadTwo.start();
 
-        //当前主线程mainThread 等待 线程1 执行结束
+        //启动线程1和2之后，这里调用threadOne.join() ---> 当前主线程mainThread 阻塞等待 线程1 执行结束
         try {
-            //线程2将会中断主线程，主线程会在这里抛出异常
+            //在线程2中，会中断主线程，主线程就会在阻塞的这里抛出异常并返回
             threadOne.join();
         } catch (InterruptedException e) {
             System.out.println("main thread:" + e);
@@ -652,5 +650,36 @@ public class Chapter1 {
         //启动线程
         threadA.start();
         threadB.start();
+    }
+
+
+    //①创建线程变量
+    //ThreadLocal 不支持 继承性
+    public static ThreadLocal<String> threadLocal = new ThreadLocal<>();
+    //InheritableThreadLocal 支持 继承性
+    public static ThreadLocal<String> inheritableThreadLocal = new InheritableThreadLocal<>();
+
+    /**
+     * ThreadLocal类 与 InheritableThreadLocal类
+     * ThreadLocal 不支持 继承性 ---> 同一个ThreadLocal变量在父线程(主线程)中被set()之后，在子线程中是获取get()不到的
+     * InheritableThreadLocal 支持 继承性 ---> 子线程可以访问在父线程中set()的本地变量
+     */
+    @Test
+    void InheritableThreadLocal() {
+        //②设置父线程变量
+        threadLocal.set("threadLocal hello world");
+        inheritableThreadLocal.set("inheritableThreadLocal hello world");
+
+        //③启动子线程
+        Thread childThread = new Thread(() -> {
+            //④子线程输出线程变量的值
+            System.out.println("childThread threadLocal: " + threadLocal.get());
+            System.out.println("childThread inheritableThreadLocal: " + inheritableThreadLocal.get());
+        });
+        childThread.start();
+
+        //⑤父线程输出线程变量的值
+        System.out.println("parentThread threadLocal: " + threadLocal.get());
+        System.out.println("parentThread inheritableThreadLocal: " + inheritableThreadLocal.get());
     }
 }
