@@ -16,7 +16,7 @@ public class Chapter3 {
     void RandomTest() {
         //创建一个默认种子的随机数生成器
         Random random = new Random();
-        //输出10个0~5(包含0不包含5)之间的随机数
+        //输出5个0~5(包含0不包含5)之间的随机数
         for (int i = 0; i < 5; i++) {
             System.out.println(random.nextInt(5));
         }
@@ -26,7 +26,7 @@ public class Chapter3 {
     void ThreadLocalRandomTest() {
         //获取一个随机数生成器
         ThreadLocalRandom random = ThreadLocalRandom.current();
-        //输出10个0~5(包含0不包含5)之间的随机数
+        //输出5个0~5(包含0不包含5)之间的随机数
         for (int i = 0; i < 5; i++) {
             System.out.println(random.nextInt(5));
         }
