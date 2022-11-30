@@ -3,6 +3,9 @@ package com.example.concurrentprogramming.chapter6;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -74,5 +77,56 @@ public class Chapter6 {
         //调用unpark方法让 childThread子线程 持有许可证，之后子线程就会从调用的park方法中返回了
         LockSupport.unpark(childThread);
 //        childThread.interrupt();
+    }
+
+
+    public void testPark() {
+        LockSupport.park(this);
+    }
+
+    @Test
+    void blockerTest() {
+        Chapter6 chapter6 = new Chapter6();
+        chapter6.testPark();
+    }
+
+
+    /**
+     * 先进先出的锁
+     */
+    class FIFOMutex {
+        private final AtomicBoolean locked = new AtomicBoolean(false);
+        private final Queue<Thread> waiters = new ConcurrentLinkedQueue<>();
+
+        public void lock() {
+            boolean wasInterrupted = false;
+            Thread current = Thread.currentThread();
+            waiters.add(current);
+
+            //(1)只有队首的线程可以获取锁
+            //如果当前线程current不是队首线程 或 当前锁已被其他线程获取并置为true
+            //---> 调用park方法阻塞自己
+            while (waiters.peek() != current || !locked.compareAndSet(false, true)) {
+                LockSupport.park(this);
+                //该线程如果被中断，就会从park方法返回，执行到这里，并且忽略中断
+                if (Thread.interrupted()) {//Thread.interrupted() 可以重置中断标志，忽略中断
+                    //忽略中断，仅做个标记
+                    wasInterrupted = true;
+                }
+                //之后继续循环判断，不是队首线程 或 被其他线程获取锁，就继续调用park方法阻塞自己
+            }
+
+            waiters.remove();
+            if (wasInterrupted) {
+                //如果标记为true，说明该线程被中断过，虽然该线程本身不关注中断，但不代表其他线程不关注
+                //所以要中断该线程，恢复中断标志
+                current.interrupt();
+            }
+        }
+
+        public void unlock() {
+            locked.set(false);
+            LockSupport.unpark(waiters.peek());
+        }
     }
 }
