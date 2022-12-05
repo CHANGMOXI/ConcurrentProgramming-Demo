@@ -74,5 +74,7 @@ public class Chapter6 {
         //调用unpark方法让 childThread子线程 持有许可证，之后子线程就会从调用的park方法中返回了
         LockSupport.unpark(childThread);
 //        childThread.interrupt();
+
+        childThread.join();
     }
 }
