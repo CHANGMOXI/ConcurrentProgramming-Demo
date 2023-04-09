@@ -5,8 +5,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author chenzhisheng
@@ -130,5 +133,118 @@ public class Chapter6 {
             locked.set(false);
             LockSupport.unpark(waiters.peek());
         }
+    }
+
+    @Test
+    void testAwaitAndSignal() throws InterruptedException {
+        ReentrantLock lock = new ReentrantLock();
+        Condition condition = lock.newCondition();
+
+        Thread threadA = new Thread(() -> {
+            lock.lock();
+            try {
+                System.out.println("begin wait");
+                condition.await();
+                System.out.println("end wait");
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                lock.unlock();
+            }
+        });
+
+        Thread threadB = new Thread(() -> {
+            lock.lock();
+            try {
+                System.out.println("begin signal");
+                condition.signal();
+                System.out.println("end signal");
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                lock.unlock();
+            }
+        });
+
+        threadA.start();
+        Thread.sleep(1000);
+        threadB.start();
+
+        threadA.join();
+        threadB.join();
+    }
+
+
+    /**
+     * 使用自定义的不可重入的独占锁NoReentrantLock 实现简单的生产——消费模型
+     */
+    final static NoReentrantLock LOCK = new NoReentrantLock();
+    // 两个条件变量用于生产者线程和消费者线程之间的同步
+    final static Condition NOT_FULL = LOCK.newCondition();
+    final static Condition NOT_EMPTY = LOCK.newCondition();
+
+    final static Queue<String> QUEUE = new LinkedBlockingQueue<>();
+    final static int QUEUE_SIZE = 10;
+
+    @Test
+    void productionConsumptionModelWithNoReentrantLock() throws InterruptedException {
+        Thread producer = new Thread(() -> {
+            // 获取不可重入的独占锁
+            LOCK.lock();
+            try {
+                // (1)如果队列满了，则等待
+                // 使用while而不是if，是为了避免虚假唤醒
+                while (QUEUE.size() == QUEUE_SIZE) {
+                    System.out.println("QUEUE full, producer await.");
+                    NOT_EMPTY.await();
+                }
+
+                // (2)元素入队
+                System.out.println("QUEUE not full, producer add element.");
+                QUEUE.add("element");
+
+                // (3)唤醒消费线程
+                System.out.println("signalAll consumer.");
+                NOT_FULL.signalAll();
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                // 释放锁
+                LOCK.unlock();
+            }
+        });
+
+        Thread consumer = new Thread(() -> {
+            // 获取不可重入的独占锁
+            LOCK.lock();
+            try {
+                // (1)如果队列空，则等待
+                // 使用while而不是if，是为了避免虚假唤醒
+                while (QUEUE.size() == 0) {
+                    System.out.println("QUEUE empty, consumer await.");
+                    NOT_FULL.await();
+                }
+
+                // (2)消费一个元素
+                System.out.println("QUEUE not empty, consumer poll element.");
+                String element = QUEUE.poll();
+
+                // (3)唤醒生产线程
+                System.out.println("signalAll producer.");
+                NOT_EMPTY.signalAll();
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                // 释放锁
+                LOCK.unlock();
+            }
+        });
+
+        // 启动线程
+        producer.start();
+        consumer.start();
+
+        producer.join();
+        consumer.join();
     }
 }
